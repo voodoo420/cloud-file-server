@@ -3,13 +3,14 @@ package ru.voodoo420.client;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class FileSender {
-    public static void sendFile(Path path, Channel channel, ChannelFutureListener finishListener) throws IOException {
+    public static void sendFile(Path path, Channel channel) throws IOException {
         FileRegion region = new DefaultFileRegion(path.toFile(), 0, Files.size(path));
 
         ByteBuf buf = null;
@@ -30,9 +31,31 @@ public class FileSender {
         buf.writeLong(Files.size(path));
         channel.writeAndFlush(buf);
 
-        ChannelFuture transferOperationFuture = channel.writeAndFlush(region);
-        if (finishListener != null) {
-            transferOperationFuture.addListener(finishListener);
+        ChannelFuture transferOperationFuture = channel.writeAndFlush(region, channel.newProgressivePromise());
+        transferOperationFuture.addListener(new ChannelProgressiveFutureListener() {
+            @Override
+            public void operationProgressed(ChannelProgressiveFuture future, long progress, long total) throws Exception {
+                clearConsole();
+                float progressFloat = (float) progress / total * 100;
+                System.out.println(Math.round(progressFloat) + "% uploaded");
+            }
+
+            @Override
+            public void operationComplete(ChannelProgressiveFuture future) throws Exception {
+                clearConsole();
+                if (future.isSuccess()) System.out.println(path.getFileName().toString() + " uploaded successfully");
+                else System.out.println(path.getFileName().toString() + "not uploaded");
+            }
+        });
+    }
+
+    public static void clearConsole() {
+        try {
+            final String os = System.getProperty("os.name");
+            if (os.contains("Windows")) Runtime.getRuntime().exec("cls");
+            else Runtime.getRuntime().exec("clear");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

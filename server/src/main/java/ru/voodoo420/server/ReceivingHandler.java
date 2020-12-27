@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.CharsetUtil;
+
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +24,7 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf buf = ((ByteBuf) msg);
+
         if (buf.toString(CharsetUtil.UTF_8).equals("ls")) {
             String pathString = System.getProperty("user.dir");
             Path path = Paths.get(pathString);
@@ -54,7 +56,7 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
                     if (buf.readableBytes() >= nextLength) {
                         byte[] fileName = new byte[nextLength];
                         buf.readBytes(fileName);
-                        System.out.println("STATE: Filename received - _" + new String(fileName, StandardCharsets.UTF_8));
+                        System.out.println("STATE: Filename received - " + new String(fileName, StandardCharsets.UTF_8));
                         out = new BufferedOutputStream(new FileOutputStream("_" + new String(fileName)));
                         currentState = TransferState.FILE_LENGTH;
                     }
@@ -82,9 +84,7 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
                 }
             }
         }
-
         if (buf.readableBytes() == 0) {
-            System.out.println("buf.readableBytes() == 0");
             buf.release();
         }
     }
