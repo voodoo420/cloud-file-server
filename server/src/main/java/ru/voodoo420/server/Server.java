@@ -7,12 +7,14 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.string.StringEncoder;
 
 public class Server {
+    private static final int port = 1210;
 
     public void run() throws Exception {
-        EventLoopGroup bossGroup = new NioEventLoopGroup();     //обработка соединения
-        EventLoopGroup workerGroup = new NioEventLoopGroup();   //обработка пайплайна
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
@@ -20,12 +22,15 @@ public class Server {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) {
-                            ch.pipeline().addLast(new ReceivingHandler());
+                            ch.pipeline()
+                                    .addLast(new StringEncoder())
+                                    .addLast(new StringEncoder())
+                                    .addLast(new ReceivingHandler());
                         }
                     });
-            ChannelFuture f = b.bind(1210).sync();
+            ChannelFuture future = b.bind(port).sync();
             System.out.println("server started");
-            f.channel().closeFuture().sync();
+            future.channel().closeFuture().sync();
         } finally {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
