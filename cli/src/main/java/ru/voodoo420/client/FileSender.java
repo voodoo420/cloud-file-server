@@ -35,8 +35,9 @@ public class FileSender {
         transferOperationFuture.addListener(new ChannelProgressiveFutureListener() {
             @Override
             public void operationProgressed(ChannelProgressiveFuture future, long progress, long total) throws Exception {
+                float uploaded = (float) progress / 1000 / 1000;
                 float progressFloat = (float) progress / total * 100;
-                System.out.println("\u001b[35m" + String.format("%.0f", Math.floor(progressFloat)) + "% uploaded");
+                System.out.println(String.format("%.1f", uploaded) + "\u001b[35mmb" + " uploaded - " + String.format("%.0f", Math.floor(progressFloat)) + "%");
             }
 
             @Override
