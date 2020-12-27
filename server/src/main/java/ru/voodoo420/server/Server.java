@@ -12,6 +12,10 @@ import io.netty.handler.codec.string.StringEncoder;
 public class Server {
     private static final int port = 1210;
 
+    public static void main(String[] args) throws Exception {
+        new Server().run();
+    }
+
     public void run() throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -35,9 +39,5 @@ public class Server {
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        new Server().run();
     }
 }

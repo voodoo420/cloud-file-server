@@ -35,27 +35,16 @@ public class FileSender {
         transferOperationFuture.addListener(new ChannelProgressiveFutureListener() {
             @Override
             public void operationProgressed(ChannelProgressiveFuture future, long progress, long total) throws Exception {
-                clearConsole();
                 float progressFloat = (float) progress / total * 100;
-                System.out.println(Math.round(progressFloat) + "% uploaded");
+                System.out.println("\u001b[35m" + String.format("%.0f", Math.floor(progressFloat)) + "% uploaded");
             }
 
             @Override
             public void operationComplete(ChannelProgressiveFuture future) throws Exception {
-                clearConsole();
-                if (future.isSuccess()) System.out.println(path.getFileName().toString() + " uploaded successfully");
-                else System.out.println(path.getFileName().toString() + "not uploaded");
+                if (future.isSuccess())
+                    System.out.println("\u001b[32m" + path.getFileName().toString() + " uploaded successfully");
+                else System.out.println("\u001b[31m" + path.getFileName().toString() + "not uploaded");
             }
         });
-    }
-
-    public static void clearConsole() {
-        try {
-            final String os = System.getProperty("os.name");
-            if (os.contains("Windows")) Runtime.getRuntime().exec("cls");
-            else Runtime.getRuntime().exec("clear");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 }
