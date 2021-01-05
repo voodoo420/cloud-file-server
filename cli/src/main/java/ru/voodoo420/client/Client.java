@@ -1,12 +1,14 @@
 package ru.voodoo420.client;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 
 public class Client {
+    private static final String COPY = "cp";
+    private static final String LIST = "ls";
+    private static final String REMOVE = "rm";
+    private static final String MOVE = "mv";
+
     public static void main(String[] args) throws Exception {
         startClient();
         processArgs(args);
@@ -20,29 +22,32 @@ public class Client {
 
     private static void processArgs(String[] args) throws IOException {
         if (args.length == 1) {
-            if (args[0].equals("ls")) sendMessage("ls");
+            if (args[0].equals(LIST)) FileOperations.showFiles();
             else printErrorMessage();
         } else if (args.length == 2) {
-            if (args[0].equals("cp")) {
-                Path path = Paths.get(args[1]);
-                if (Files.exists(path)) uploadFile(path);
-                else System.out.println(args[1] + " not exists");
-            } else printErrorMessage();
+            switch (args[0]) {
+                case COPY:
+                    FileOperations.sendFile(args[1], false);
+                    break;
+                case REMOVE:
+                    FileOperations.removeFile(args[1]);
+                    break;
+                case MOVE:
+                    FileOperations.sendFile(args[1], true );
+                    break;
+                default:
+                    printErrorMessage();
+                    break;
+            }
         } else printErrorMessage();
     }
 
     private static void printErrorMessage() {
         System.out.println("List of parameters:\n" +
+                "ls             - list of files\n +" +
                 "cp file.name   - copy file to server\n" +
-                "ls             - list of files");
+                "rm             - delete file\n" +
+                "mv             - move file to server");
         System.exit(0);
-    }
-
-    private static void uploadFile(Path path) throws IOException {
-        FileSender.sendFile(path, Network.getInstance().getCurrentChannel());
-    }
-
-    private static void sendMessage(String message) throws IOException {
-        Network.getInstance().sendMessage(message);
     }
 }

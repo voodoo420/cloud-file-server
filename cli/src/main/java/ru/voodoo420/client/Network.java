@@ -61,10 +61,6 @@ public class Network {
         }
     }
 
-    public void sendMessage(String message) {
-        currentChannel.writeAndFlush(message);
-    }
-
     public void stop() {
         currentChannel.close();
     }

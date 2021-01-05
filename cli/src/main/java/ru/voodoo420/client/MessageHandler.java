@@ -8,6 +8,8 @@ public class MessageHandler extends SimpleChannelInboundHandler<String> {
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, String message) throws Exception {
         System.out.println(message);
+        //todo проверить отображается ли полный список файлов при ls
+        System.exit(0);
     }
 
     @Override
