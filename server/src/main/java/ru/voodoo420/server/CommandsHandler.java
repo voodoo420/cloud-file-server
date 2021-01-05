@@ -1,8 +1,11 @@
 package ru.voodoo420.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.DefaultFileRegion;
+import io.netty.channel.FileRegion;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
@@ -16,6 +19,7 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
     private static final byte LS = 10;
     private static final byte CP = 11;
     private static final byte RM = 12;
+    private static final byte CPFS = 13;
 
     private State currentState = State.WAITING;
     private int nextLength;
@@ -42,6 +46,8 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                     ctx.close();
                 } else if (firstByte == RM) {
                     currentState = State.RECEIVING_FILE_TO_DELETE_NAME_LENGTH;
+                } else if (firstByte == CPFS) {
+                    currentState = State.RECEIVING_FILE_TO_SEND_NAME_LENGTH;
                 } else {
                     System.out.println("ERROR: Invalid first byte - " + firstByte);
                 }
@@ -72,6 +78,37 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                 }
             }
 
+            if (currentState == State.RECEIVING_FILE_TO_SEND_NAME_LENGTH) {
+                if (buf.readableBytes() >= 4) {
+                    System.out.println("STATE: [SENDING] Get filename length");
+                    nextLength = buf.readInt();
+                    currentState = State.RECEIVING_FILE_TO_SEND_NAME;
+                }
+            }
+
+            if (currentState == State.RECEIVING_FILE_TO_SEND_NAME) {
+                if (buf.readableBytes() >= nextLength) {
+                    byte[] fileNameBytes = new byte[nextLength];
+                    buf.readBytes(fileNameBytes);
+                    String fileName = new String(fileNameBytes, StandardCharsets.UTF_8);
+                    Path path = Paths.get(fileName);
+                    if (Files.exists(path)) {
+                        FileSender.sendFile(fileName, false, future -> {
+                            if (!future.isSuccess()) {
+                                future.cause().printStackTrace();
+                            }
+                            if (future.isSuccess()) {
+                                System.out.println(fileName + " sent");
+                            }
+                        });
+
+                    } else {
+                        ctx.writeAndFlush(fileName + " not exists");
+                    }
+                    currentState = State.WAITING;
+                }
+            }
+
             if (currentState == State.RECEIVING_FILE_NAME_LENGTH) {
                 if (buf.readableBytes() >= 4) {
                     System.out.println("STATE: Get filename length");
@@ -85,6 +122,7 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                     byte[] fileName = new byte[nextLength];
                     buf.readBytes(fileName);
                     System.out.println("STATE: Filename received - " + new String(fileName, StandardCharsets.UTF_8));
+                    //todo убрать "_" в имени
                     out = new BufferedOutputStream(new FileOutputStream("_" + new String(fileName)));
                     currentState = State.RECEIVING_FILE_LENGTH;
                 }

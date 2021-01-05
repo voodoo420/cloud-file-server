@@ -8,6 +8,7 @@ public class Client {
     private static final String LIST = "ls";
     private static final String REMOVE = "rm";
     private static final String MOVE = "mv";
+    private static final String COPY_FROM_SERVER = "cpfs";
 
     public static void main(String[] args) throws Exception {
         startClient();
@@ -35,6 +36,9 @@ public class Client {
                 case MOVE:
                     FileOperations.sendFile(args[1], true );
                     break;
+                case COPY_FROM_SERVER:
+                    FileOperations.copyFromServer(args[1], false);
+                    break;
                 default:
                     printErrorMessage();
                     break;
@@ -44,10 +48,10 @@ public class Client {
 
     private static void printErrorMessage() {
         System.out.println("List of parameters:\n" +
-                "ls             - list of files\n +" +
+                "ls             - list of files\n" +
                 "cp file.name   - copy file to server\n" +
-                "rm             - delete file\n" +
-                "mv             - move file to server");
+                "rm file.name   - delete file from\n" +
+                "mv file.name   - move file to server");
         System.exit(0);
     }
 }

@@ -6,7 +6,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
@@ -19,9 +18,6 @@ public class Network {
 
     public static Network getInstance() {
         return instance;
-    }
-
-    private Network() {
     }
 
     private Channel currentChannel;
@@ -40,9 +36,10 @@ public class Network {
                     .handler(new ChannelInitializer<SocketChannel>() {
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             socketChannel.pipeline()
-                                    .addLast(new StringDecoder())
-                                    .addLast(new StringEncoder())
-                                    .addLast(new MessageHandler());
+//                                    .addLast(new StringDecoder())
+//                                    .addLast(new MessageHandler())
+                                    .addLast(new ReceivingHandler())
+                            ;
                             currentChannel = socketChannel;
                         }
                     });

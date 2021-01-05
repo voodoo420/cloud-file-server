@@ -14,14 +14,13 @@ public class FileOperations {
     private static final byte LS = 10;
     private static final byte CP = 11;
     private static final byte RM = 12;
+    private static final byte CPFS = 13;
 
     private static final Channel channel = Network.getInstance().getCurrentChannel();
     private static ByteBuf buf;
 
     public static void showFiles() {
-        buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-        buf.writeByte(LS);
-        channel.writeAndFlush(buf);
+        sendFirstByte(LS);
     }
 
     public static void sendFile(String fileName, boolean isMoving) throws IOException {
@@ -29,12 +28,8 @@ public class FileOperations {
             Path path = Paths.get(fileName);
             FileRegion region = new DefaultFileRegion(path.toFile(), 0, Files.size(path));
 
-            buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-            buf.writeByte(CP);
-            channel.writeAndFlush(buf);
-
-            byte[] filenameBytes = path.getFileName().toString().getBytes(StandardCharsets.UTF_8);
-            sendFileName(filenameBytes);
+            sendFirstByte(CP);
+            sendFileName(fileName);
 
             buf = ByteBufAllocator.DEFAULT.directBuffer(8);
             buf.writeLong(Files.size(path));
@@ -65,21 +60,29 @@ public class FileOperations {
 
     }
 
-    public static void removeFile(String fileName) {
-        buf = ByteBufAllocator.DEFAULT.directBuffer(1);
-        buf.writeByte(RM);
-        channel.writeAndFlush(buf);
-
-        byte[] filenameBytes = fileName.getBytes(StandardCharsets.UTF_8);
-        sendFileName(filenameBytes);
-    }
-
     private static boolean checkFileExisting(String fileName) {
         Path path = Paths.get(fileName);
         return Files.exists(path);
     }
 
-    private static void sendFileName(byte[] filenameBytes) {
+    public static void removeFile(String fileName) {
+        sendFirstByte(RM);
+        sendFileName(fileName);
+    }
+
+    public static void copyFromServer(String fileName, boolean isMoving) {
+        sendFirstByte(CPFS);
+        sendFileName(fileName);
+    }
+
+    private static void sendFirstByte(byte fistByte) {
+        buf = ByteBufAllocator.DEFAULT.directBuffer(1);
+        buf.writeByte(fistByte);
+        channel.writeAndFlush(buf);
+    }
+
+    private static void sendFileName(String fileName) {
+        byte[] filenameBytes = fileName.getBytes(StandardCharsets.UTF_8);
         buf = ByteBufAllocator.DEFAULT.directBuffer(4);
         buf.writeInt(filenameBytes.length);
         channel.writeAndFlush(buf);
