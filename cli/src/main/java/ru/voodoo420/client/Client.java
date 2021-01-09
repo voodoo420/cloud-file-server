@@ -8,6 +8,7 @@ public class Client {
     private static final String LIST = "ls";
     private static final String REMOVE = "rm";
     private static final String MOVE = "mv";
+    private static final String COPY_FILE_FROM_SERVE = "cpfs";
 
     public static void main(String[] args) throws Exception {
         startClient();
@@ -34,6 +35,9 @@ public class Client {
                     break;
                 case MOVE:
                     FileOperations.sendFile(args[1], true );
+                    break;
+                case COPY_FILE_FROM_SERVE:
+                    FileOperations.copyFileFromServer(args[1]);
                     break;
                 default:
                     printErrorMessage();

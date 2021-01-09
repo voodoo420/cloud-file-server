@@ -1,6 +1,7 @@
 package ru.voodoo420.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
@@ -16,6 +17,8 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
     private static final byte LS = 10;
     private static final byte CP = 11;
     private static final byte RM = 12;
+    public static final byte CPFS = 13;
+    private static final byte MESSAGE = 14;
 
     private State currentState = State.WAITING;
     private int nextLength;
@@ -26,22 +29,29 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf buf = ((ByteBuf) msg);
-
         while (buf.readableBytes() > 0) {
+            //todo логирование
             if (currentState == State.WAITING) {
                 byte firstByte = buf.readByte();
                 if (firstByte == CP) {
-                    currentState = State.RECEIVING_FILE_NAME_LENGTH;
+                    currentState = State.RECEIVING_FILE_TO_RECEIVE_NAME_LENGTH;
                     receivedFileLength = 0L;
                     System.out.println("STATE: Start file receiving");
                 } else if (firstByte == LS) {
-                    String pathString = System.getProperty("user.dir");
-                    Path path = Paths.get(pathString);
+                    buf.writeByte(MESSAGE);
+                    ctx.writeAndFlush(buf);
+
+                    Path path = Paths.get(System.getProperty("user.dir"));
                     Stream<Path> files = Files.list(path);
-                    files.forEach((file) -> ctx.writeAndFlush(file.getFileName().toString() + "\n"));
-                    ctx.close();
+
+                    //todo io.netty.util.IllegalReferenceCountException: refCnt: 0
+                    files.forEach((file) -> ctx.fireChannelRead(file.getFileName().toString() + "\n"));
+
+
                 } else if (firstByte == RM) {
                     currentState = State.RECEIVING_FILE_TO_DELETE_NAME_LENGTH;
+                } else if (firstByte == CPFS) {
+                    currentState = State.RECEIVING_FILE_TO_SEND_NAME_LENGTH;
                 } else {
                     System.out.println("ERROR: Invalid first byte - " + firstByte);
                 }
@@ -72,25 +82,57 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_NAME_LENGTH) {
+            if (currentState == State.RECEIVING_FILE_TO_SEND_NAME_LENGTH) {
                 if (buf.readableBytes() >= 4) {
-                    System.out.println("STATE: Get filename length");
+                    System.out.println("STATE: [SENDING] Get filename length");
                     nextLength = buf.readInt();
-                    currentState = State.RECEIVING_FILE_NAME;
+                    currentState = State.RECEIVING_FILE_TO_SEND_NAME;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_NAME) {
+            if (currentState == State.RECEIVING_FILE_TO_SEND_NAME) {
+                if (buf.readableBytes() >= nextLength) {
+                    byte[] fileNameBytes = new byte[nextLength];
+                    buf.readBytes(fileNameBytes);
+                    String fileName = new String(fileNameBytes, StandardCharsets.UTF_8);
+                    Path path = Paths.get(fileName);
+                    if (Files.exists(path)) {
+                        FileSender.sendFile(path, ctx.channel(), future -> {
+                            if (!future.isSuccess()) {
+                                future.cause().printStackTrace();
+                            }
+                            if (future.isSuccess()) {
+                                System.out.println("File sent successfully");
+
+                            }
+                        });
+                    } else {
+                        ctx.writeAndFlush(fileName + " not exists");
+                    }
+                    currentState = State.WAITING;
+                }
+            }
+
+            if (currentState == State.RECEIVING_FILE_TO_RECEIVE_NAME_LENGTH) {
+                if (buf.readableBytes() >= 4) {
+                    System.out.println("STATE: Get filename length");
+                    nextLength = buf.readInt();
+                    currentState = State.RECEIVING_FILE_TO_RECEIVE_NAME;
+                }
+            }
+
+            if (currentState == State.RECEIVING_FILE_TO_RECEIVE_NAME) {
                 if (buf.readableBytes() >= nextLength) {
                     byte[] fileName = new byte[nextLength];
                     buf.readBytes(fileName);
                     System.out.println("STATE: Filename received - " + new String(fileName, StandardCharsets.UTF_8));
+                    //todo удалить "_"
                     out = new BufferedOutputStream(new FileOutputStream("_" + new String(fileName)));
-                    currentState = State.RECEIVING_FILE_LENGTH;
+                    currentState = State.RECEIVING_FILE_TO_RECEIVE_LENGTH;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_LENGTH) {
+            if (currentState == State.RECEIVING_FILE_TO_RECEIVE_LENGTH) {
                 if (buf.readableBytes() >= 8) {
                     fileLength = buf.readLong();
                     System.out.println("STATE: File length received - " + fileLength);

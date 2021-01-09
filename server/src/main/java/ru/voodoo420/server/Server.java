@@ -28,7 +28,8 @@ public class Server {
                         public void initChannel(SocketChannel ch) {
                             ch.pipeline()
                                     .addLast(new StringEncoder())
-                                    .addLast(new CommandsHandler());
+                                    .addLast(new CommandsHandler())
+                                    .addLast(new MessageHandler());
                         }
                     });
             ChannelFuture future = b.bind(port).sync();

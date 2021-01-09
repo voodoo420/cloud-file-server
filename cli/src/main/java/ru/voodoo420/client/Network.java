@@ -40,9 +40,11 @@ public class Network {
                     .handler(new ChannelInitializer<SocketChannel>() {
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             socketChannel.pipeline()
+                                    .addLast(new ReceivingHandler())
+
                                     .addLast(new StringDecoder())
-                                    .addLast(new StringEncoder())
-                                    .addLast(new MessageHandler());
+//                                    .addLast(new StringEncoder())
+                                    .addLast(new MessageHandler() );
                             currentChannel = socketChannel;
                         }
                     });
