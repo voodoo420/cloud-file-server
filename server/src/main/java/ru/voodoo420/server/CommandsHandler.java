@@ -29,8 +29,10 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf buf = ((ByteBuf) msg);
-        while (buf.readableBytes() > 0) {
+//        System.out.println("refcount: " + buf.refCnt());
+        while (buf.readableBytes() > 0 && buf.refCnt() > 0) {
             //todo логирование
+            System.out.println("refcount: " + buf.refCnt());
             if (currentState == State.WAITING) {
                 byte firstByte = buf.readByte();
                 if (firstByte == CP) {
@@ -38,15 +40,15 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                     receivedFileLength = 0L;
                     System.out.println("STATE: Start file receiving");
                 } else if (firstByte == LS) {
+                    //после отправки списка: io.netty.util.IllegalReferenceCountException: refCnt: 0
+
                     buf.writeByte(MESSAGE);
                     ctx.writeAndFlush(buf);
 
                     Path path = Paths.get(System.getProperty("user.dir"));
                     Stream<Path> files = Files.list(path);
-
-                    //todo io.netty.util.IllegalReferenceCountException: refCnt: 0
-                    files.forEach((file) -> ctx.fireChannelRead(file.getFileName().toString() + "\n"));
-
+                    files.forEach((file) -> ctx.write(file.getFileName().toString() + "\n"));
+                    ctx.flush();
 
                 } else if (firstByte == RM) {
                     currentState = State.RECEIVING_FILE_TO_DELETE_NAME_LENGTH;
@@ -103,7 +105,6 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                             }
                             if (future.isSuccess()) {
                                 System.out.println("File sent successfully");
-
                             }
                         });
                     } else {

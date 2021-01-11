@@ -86,6 +86,7 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
                             || receivedFileLength == progressBytes[4] || receivedFileLength == progressBytes[5]
                             || receivedFileLength == progressBytes[6] || receivedFileLength == progressBytes[7]
                             || receivedFileLength == progressBytes[8]) {
+                        //todo отдельный поток?
                         float downloaded = (float) receivedFileLength / 1000 / 1000;
                         float progressFloat = (float) receivedFileLength / fileLength * 100;
                         System.out.println("\u001b[35m" + String.format("%.1f", downloaded) + "mb downloaded - "

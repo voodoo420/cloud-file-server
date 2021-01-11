@@ -85,6 +85,7 @@ public class FileOperations {
             @Override
             public void operationProgressed(ChannelProgressiveFuture future, long progress, long total) throws Exception {
                 int progressInt = Math.round((float) progress / total * 100);
+                //todo отдельный поток?
                 if (progressList.contains(progressInt)) {
                     if (progressInt == 10 || progressInt == 20 || progressInt == 30 || progressInt == 40
                             || progressInt == 50 || progressInt == 60 || progressInt == 70 || progressInt == 80
