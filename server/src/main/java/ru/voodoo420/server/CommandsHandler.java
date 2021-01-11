@@ -1,7 +1,6 @@
 package ru.voodoo420.server;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
@@ -11,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 public class CommandsHandler extends ChannelInboundHandlerAdapter {
     private static final byte LS = 10;
@@ -29,10 +28,8 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf buf = ((ByteBuf) msg);
-//        System.out.println("refcount: " + buf.refCnt());
-        while (buf.readableBytes() > 0 && buf.refCnt() > 0) {
+        while (buf.readableBytes() > 0) {
             //todo логирование
-            System.out.println("refcount: " + buf.refCnt());
             if (currentState == State.WAITING) {
                 byte firstByte = buf.readByte();
                 if (firstByte == CP) {
@@ -40,34 +37,42 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                     receivedFileLength = 0L;
                     System.out.println("STATE: Start file receiving");
                 } else if (firstByte == LS) {
-                    //после отправки списка: io.netty.util.IllegalReferenceCountException: refCnt: 0
-
                     buf.writeByte(MESSAGE);
-                    ctx.writeAndFlush(buf);
-
-                    Path path = Paths.get(System.getProperty("user.dir"));
-                    Stream<Path> files = Files.list(path);
-                    files.forEach((file) -> ctx.write(file.getFileName().toString() + "\n"));
-                    ctx.flush();
-
+                    ctx.writeAndFlush(buf.retain());
+                    currentState = State.SENDING_FILES_LIST;
                 } else if (firstByte == RM) {
                     currentState = State.RECEIVING_FILE_TO_DELETE_NAME_LENGTH;
+                    receivedFileLength = 0L;
                 } else if (firstByte == CPFS) {
                     currentState = State.RECEIVING_FILE_TO_SEND_NAME_LENGTH;
+                    receivedFileLength = 0L;
                 } else {
                     System.out.println("ERROR: Invalid first byte - " + firstByte);
                 }
+            }
+
+            if (currentState == State.SENDING_FILES_LIST) {
+                System.out.println("STATE: Start file list sending");
+                Path path = Paths.get(System.getProperty("user.dir"));
+                String filesList = Files.list(path)
+                        .map(p -> p.getFileName().toString())
+                        .sorted()
+                        .collect(Collectors.joining("\n"));
+                buf.writeBytes(filesList.getBytes(StandardCharsets.UTF_8));
+                ctx.writeAndFlush(buf);
+                currentState = State.WAITING;
+                break;
             }
 
             if (currentState == State.RECEIVING_FILE_TO_DELETE_NAME_LENGTH) {
                 if (buf.readableBytes() >= 4) {
                     System.out.println("STATE: [DELETING] Get filename length");
                     nextLength = buf.readInt();
-                    currentState = State.RECEIVING_FILE_TO_DELETE_NAME;
+                    currentState = State.DELETING_FILE;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_TO_DELETE_NAME) {
+            if (currentState == State.DELETING_FILE) {
                 if (buf.readableBytes() >= nextLength) {
                     byte[] fileNameBytes = new byte[nextLength];
                     buf.readBytes(fileNameBytes);
@@ -88,11 +93,11 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                 if (buf.readableBytes() >= 4) {
                     System.out.println("STATE: [SENDING] Get filename length");
                     nextLength = buf.readInt();
-                    currentState = State.RECEIVING_FILE_TO_SEND_NAME;
+                    currentState = State.SENDING_FILE;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_TO_SEND_NAME) {
+            if (currentState == State.SENDING_FILE) {
                 if (buf.readableBytes() >= nextLength) {
                     byte[] fileNameBytes = new byte[nextLength];
                     buf.readBytes(fileNameBytes);
@@ -118,22 +123,22 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                 if (buf.readableBytes() >= 4) {
                     System.out.println("STATE: Get filename length");
                     nextLength = buf.readInt();
-                    currentState = State.RECEIVING_FILE_TO_RECEIVE_NAME;
+                    currentState = State.RECEIVING_FILE_NAME;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_TO_RECEIVE_NAME) {
+            if (currentState == State.RECEIVING_FILE_NAME) {
                 if (buf.readableBytes() >= nextLength) {
                     byte[] fileName = new byte[nextLength];
                     buf.readBytes(fileName);
                     System.out.println("STATE: Filename received - " + new String(fileName, StandardCharsets.UTF_8));
                     //todo удалить "_"
                     out = new BufferedOutputStream(new FileOutputStream("_" + new String(fileName)));
-                    currentState = State.RECEIVING_FILE_TO_RECEIVE_LENGTH;
+                    currentState = State.RECEIVING_FILE_LENGTH;
                 }
             }
 
-            if (currentState == State.RECEIVING_FILE_TO_RECEIVE_LENGTH) {
+            if (currentState == State.RECEIVING_FILE_LENGTH) {
                 if (buf.readableBytes() >= 8) {
                     fileLength = buf.readLong();
                     System.out.println("STATE: File length received - " + fileLength);
@@ -155,7 +160,9 @@ public class CommandsHandler extends ChannelInboundHandlerAdapter {
                 }
             }
         }
+
         if (buf.readableBytes() == 0) {
+            System.out.println(buf.refCnt());
             buf.release();
         }
     }

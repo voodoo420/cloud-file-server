@@ -23,7 +23,6 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf buf = ((ByteBuf) msg);
-
         while (buf.readableBytes() > 0) {
             //todo логирование
             if (currentState == State.WAITING) {
@@ -33,7 +32,6 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
                     receivedFileLength = 0L;
                     System.out.println("STATE: Start file receiving");
                 } else if (firstByte == MESSAGE) {
-                    System.out.println("STATE: Start message receiving");
                     currentState = State.RECEIVING_MESSAGE;
                 } else {
                     System.out.println("ERROR: Invalid first byte - " + firstByte);
@@ -41,8 +39,10 @@ public class ReceivingHandler extends ChannelInboundHandlerAdapter {
             }
 
             if (currentState == State.RECEIVING_MESSAGE) {
-                ctx.fireChannelRead(buf);
+                System.out.println("STATE: Start message receiving");
+                ctx.fireChannelRead(buf.retain());
                 currentState = State.WAITING;
+                break;
             }
 
             if (currentState == State.RECEIVING_FILE_NAME_LENGTH) {
